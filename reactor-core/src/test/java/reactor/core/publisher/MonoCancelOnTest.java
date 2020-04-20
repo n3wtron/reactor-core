@@ -55,6 +55,7 @@ public class MonoCancelOnTest {
 	public void scanOperator() {
 		MonoCancelOn<String> test = new MonoCancelOn<>(Mono.empty(), Schedulers.immediate());
 
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 		assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.immediate());
 	}
 }

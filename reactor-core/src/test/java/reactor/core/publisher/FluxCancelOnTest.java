@@ -68,6 +68,7 @@ public class FluxCancelOnTest {
 		Subscription parent = Operators.emptySubscription();
 		test.onSubscribe(parent);
 
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 		assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.single());
 		assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
 		assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);

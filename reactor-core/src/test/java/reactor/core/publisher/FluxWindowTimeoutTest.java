@@ -33,6 +33,7 @@ import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
 
+import static org.assertj.core.api.Assertions.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class FluxWindowTimeoutTest {
@@ -268,24 +269,30 @@ public class FluxWindowTimeoutTest {
 		Subscription parent = Operators.emptySubscription();
 		test.onSubscribe(parent);
 
-		Assertions.assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(scheduler.createWorker());
-		Assertions.assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
-		Assertions.assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
-		Assertions.assertThat(test.scan(Scannable.Attr.CAPACITY)).isEqualTo(123);
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
+		assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(scheduler.createWorker());
+		assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
+		assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
+		assertThat(test.scan(Scannable.Attr.CAPACITY)).isEqualTo(123);
+
 		test.requested = 35;
-		Assertions.assertThat(test.scan(Scannable.Attr.REQUESTED_FROM_DOWNSTREAM)).isEqualTo(35);
-		Assertions.assertThat(test.scan(Scannable.Attr.BUFFERED)).isEqualTo(0);
+
+		assertThat(test.scan(Scannable.Attr.REQUESTED_FROM_DOWNSTREAM)).isEqualTo(35);
+		assertThat(test.scan(Scannable.Attr.BUFFERED)).isEqualTo(0);
+
 		test.onNext(1);
 		test.onNext(2);
-		Assertions.assertThat(test.inners().findFirst().get().scan(Scannable.Attr.BUFFERED)).isEqualTo(2);
-		Assertions.assertThat(test.inners().findFirst().get().scan(Scannable.Attr
-				.CANCELLED)).isEqualTo(false);
-		Assertions.assertThat(test.scan(Scannable.Attr.TERMINATED)).isFalse();
-		test.onComplete();
-		Assertions.assertThat(test.scan(Scannable.Attr.TERMINATED)).isTrue();
 
-		Assertions.assertThat(test.scan(Scannable.Attr.CANCELLED)).isFalse();
+		assertThat(test.inners().findFirst().get().scan(Scannable.Attr.BUFFERED)).isEqualTo(2);
+		assertThat(test.inners().findFirst().get().scan(Scannable.Attr.CANCELLED)).isEqualTo(false);
+		assertThat(test.scan(Scannable.Attr.TERMINATED)).isFalse();
+
+		test.onComplete();
+
+		assertThat(test.scan(Scannable.Attr.TERMINATED)).isTrue();
+
+		assertThat(test.scan(Scannable.Attr.CANCELLED)).isFalse();
 		test.cancel();
-		Assertions.assertThat(test.scan(Scannable.Attr.CANCELLED)).isTrue();
+		assertThat(test.scan(Scannable.Attr.CANCELLED)).isTrue();
     }
 }

@@ -532,7 +532,7 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 			if (key == Attr.DELAY_ERROR) return delayError;
 			if (key == Attr.PREFETCH) return prefetch;
 			if (key == Attr.RUN_ON) return worker;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerOperator.super.scanUnsafe(key);
 		}
 
@@ -957,7 +957,7 @@ final class FluxPublishOn<T> extends FluxOperator<T, T> implements Fuseable {
 			if (key == Attr.DELAY_ERROR) return delayError;
 			if (key == Attr.PREFETCH) return prefetch;
 			if (key == Attr.RUN_ON) return worker;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerOperator.super.scanUnsafe(key);
 		}
 

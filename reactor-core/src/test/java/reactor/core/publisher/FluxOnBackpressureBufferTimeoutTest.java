@@ -344,5 +344,6 @@ public class FluxOnBackpressureBufferTimeoutTest implements Consumer<Object> {
 		assertThat(test.scan(Scannable.Attr.PREFETCH)).isEqualTo(Integer.MAX_VALUE);
 		assertThat(test.scan(Scannable.Attr.DELAY_ERROR)).isFalse();
 		assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.immediate());
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 	}
 }

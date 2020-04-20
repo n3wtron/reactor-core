@@ -210,6 +210,8 @@ public interface Scannable {
 		 */
 		public static final Attr<Stream<Tuple2<String, String>>> TAGS = new Attr<>(null);
 
+		public static final Attr<Boolean> THREAD_MODIFIER = new Attr<>(false);
+
 		/**
 		 * Meaningful and always applicable default value for the attribute, returned
 		 * instead of {@literal null} when a specific value hasn't been defined for a

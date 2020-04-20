@@ -63,7 +63,7 @@ final class FluxRefCountGrace<T> extends Flux<T> implements Scannable, Fuseable 
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.PREFETCH) return getPrefetch();
 		if (key == Attr.PARENT) return source;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return null;
 	}
 

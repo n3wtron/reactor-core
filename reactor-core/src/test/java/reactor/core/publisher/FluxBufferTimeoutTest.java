@@ -118,6 +118,7 @@ public class FluxBufferTimeoutTest {
 			test.requested = 3L;
 			test.index = 100;
 
+			assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 			assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(worker);
 			assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(subscription);
 			assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);

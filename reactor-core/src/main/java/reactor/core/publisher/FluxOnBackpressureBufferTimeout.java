@@ -82,7 +82,7 @@ final class FluxOnBackpressureBufferTimeout<O> extends FluxOperator<O, O> {
 	@Override
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.RUN_ON) return ttlScheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return super.scanUnsafe(key);
 	}
 
@@ -159,7 +159,7 @@ final class FluxOnBackpressureBufferTimeout<O> extends FluxOperator<O, O> {
 				return false;
 			}
 			if (key == Attr.RUN_ON) return ttlScheduler;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerOperator.super.scanUnsafe(key);
 		}
 

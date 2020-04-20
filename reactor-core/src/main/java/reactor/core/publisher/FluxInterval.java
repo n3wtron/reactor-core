@@ -79,7 +79,7 @@ final class FluxInterval extends Flux<Long> implements SourceProducer<Long> {
 	@Override
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.RUN_ON) return timedScheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return null;
 	}
 
@@ -112,7 +112,7 @@ final class FluxInterval extends Flux<Long> implements SourceProducer<Long> {
 		public Object scanUnsafe(Attr key) {
 			if (key == Attr.CANCELLED) return cancelled;
 			if (key == Attr.RUN_ON) return worker;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerProducer.super.scanUnsafe(key);
 		}
 

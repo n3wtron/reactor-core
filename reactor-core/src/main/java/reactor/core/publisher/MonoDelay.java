@@ -68,7 +68,7 @@ final class MonoDelay extends Mono<Long> implements Scannable,  SourceProducer<L
 	@Override
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.RUN_ON) return timedScheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return null;
 	}
 
@@ -105,7 +105,7 @@ final class MonoDelay extends Mono<Long> implements Scannable,  SourceProducer<L
 		public Object scanUnsafe(Attr key) {
 			if (key == Attr.TERMINATED) return cancel == FINISHED;
 			if (key == Attr.CANCELLED) return cancel == OperatorDisposables.DISPOSED;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerProducer.super.scanUnsafe(key);
 		}
 

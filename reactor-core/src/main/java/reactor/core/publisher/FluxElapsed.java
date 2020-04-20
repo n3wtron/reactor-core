@@ -46,7 +46,7 @@ final class FluxElapsed<T> extends FluxOperator<T, Tuple2<Long, T>> implements F
 	@Override
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.RUN_ON) return scheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return super.scanUnsafe(key);
 	}
 
@@ -73,7 +73,7 @@ final class FluxElapsed<T> extends FluxOperator<T, Tuple2<Long, T>> implements F
 		public Object scanUnsafe(Attr key) {
 			if (key == Attr.PARENT) return s;
 			if (key == Attr.RUN_ON) return scheduler;
-
+			if (key == Attr.THREAD_MODIFIER) return true;
 			return InnerOperator.super.scanUnsafe(key);
 		}
 

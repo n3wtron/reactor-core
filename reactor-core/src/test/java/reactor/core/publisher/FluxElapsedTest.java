@@ -61,6 +61,7 @@ public class FluxElapsedTest {
 
         assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
         assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
+        assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
         assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.single());
     }
 }

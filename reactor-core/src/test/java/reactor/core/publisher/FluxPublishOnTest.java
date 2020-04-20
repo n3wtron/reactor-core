@@ -1272,6 +1272,7 @@ public class FluxPublishOnTest extends FluxOperatorTest<String, String> {
         Subscription parent = Operators.emptySubscription();
         test.onSubscribe(parent);
 
+        Assertions.assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
         Assertions.assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
         Assertions.assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
         Assertions.assertThat(test.scan(Scannable.Attr.DELAY_ERROR)).isTrue();
@@ -1305,6 +1306,7 @@ public class FluxPublishOnTest extends FluxOperatorTest<String, String> {
         Subscription parent = Operators.emptySubscription();
         test.onSubscribe(parent);
 
+		Assertions.assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
         Assertions.assertThat(test.scan(Scannable.Attr.PARENT)).isSameAs(parent);
         Assertions.assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
         Assertions.assertThat(test.scan(Scannable.Attr.DELAY_ERROR)).isTrue();

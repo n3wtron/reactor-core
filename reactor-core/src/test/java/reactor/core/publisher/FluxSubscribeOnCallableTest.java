@@ -192,6 +192,7 @@ public class FluxSubscribeOnCallableTest {
 
         Assertions.assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
         Assertions.assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.single());
+        Assertions.assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
         test.value = 1;
         Assertions.assertThat(test.scan(Scannable.Attr.BUFFERED)).isEqualTo(1);
 

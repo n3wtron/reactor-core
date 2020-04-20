@@ -76,6 +76,7 @@ public class MonoDelayTest {
 		MonoDelay test = new MonoDelay(1, TimeUnit.SECONDS, Schedulers.immediate());
 
 		assertThat(test.scan(Scannable.Attr.RUN_ON)).isSameAs(Schedulers.immediate());
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 	}
 
 	@Test
@@ -88,6 +89,7 @@ public class MonoDelayTest {
 
 		assertThat(test.scan(Scannable.Attr.PARENT)).isNull();
 		assertThat(test.scan(Scannable.Attr.ACTUAL)).isSameAs(actual);
+		assertThat(test.scan(Scannable.Attr.THREAD_MODIFIER)).isTrue();
 
 		assertThat(test.scan(Scannable.Attr.TERMINATED)).isFalse();
 		test.request(1);

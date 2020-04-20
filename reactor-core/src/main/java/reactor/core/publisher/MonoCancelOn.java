@@ -36,7 +36,7 @@ final class MonoCancelOn<T> extends MonoOperator<T, T> {
 	@Override
 	public Object scanUnsafe(Attr key) {
 		if (key == Attr.RUN_ON) return scheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return super.scanUnsafe(key);
 	}
 }

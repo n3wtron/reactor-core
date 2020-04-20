@@ -61,7 +61,7 @@ final class MonoSubscribeOnCallable<T> extends Mono<T> implements Fuseable, Scan
 	@Override
 	public Object scanUnsafe(Scannable.Attr key) {
 		if (key == Scannable.Attr.RUN_ON) return scheduler;
-
+		if (key == Attr.THREAD_MODIFIER) return true;
 		return null;
 	}
 }
