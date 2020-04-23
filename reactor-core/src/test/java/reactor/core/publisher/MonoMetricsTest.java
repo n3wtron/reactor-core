@@ -17,6 +17,8 @@
 package reactor.core.publisher;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -243,6 +245,10 @@ public class MonoMetricsTest {
 				.as("subscribe to complete timer")
 				.isGreaterThanOrEqualTo(100);
 
+		assertThat(stcCompleteTimer.takeSnapshot().percentileValues())
+				.as("subscribe to complete timer shouldn't has percentiles")
+				.isEmpty();
+
 		assertThat(stcErrorTimer)
 				.as("subscribe to error timer is lazily registered")
 				.isNull();
@@ -250,6 +256,28 @@ public class MonoMetricsTest {
 		assertThat(stcCancelTimer)
 				.as("subscribe to cancel timer")
 				.isNull();
+	}
+
+	@Test
+	public void subscribeToCompleteWithPercentiles() {
+		Mono<Long> source = Mono.delay(Duration.ofMillis(100))
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		new MonoMetrics<>(source, registry,percentiles)
+				.block();
+
+		Timer stcCompleteTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_ON_COMPLETE))
+				.timer();
+
+		assertThat(stcCompleteTimer)
+				.as("subscribe to complete timer exists")
+				.isNotNull();
+
+		assertThat(stcCompleteTimer.takeSnapshot().percentileValues())
+				.as("subscribe to complete timer has percentiles")
+				.hasSameSizeAs(percentiles)
+				.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
 	}
 
 	@Test
@@ -282,9 +310,39 @@ public class MonoMetricsTest {
 					.as("subscribe to error timer")
 					.isGreaterThanOrEqualTo(100);
 
+			assertThat(stcErrorTimer.takeSnapshot().percentileValues())
+					.as("subscribe to error timer shouldn't has percentiles")
+					.isEmpty();
+
 			assertThat(stcCancelTimer)
 					.as("subscribe to cancel timer")
 					.isNull();
+		});
+	}
+
+	@Test
+	public void subscribeToErrorWithPercentiles() {
+		Mono<Long> source = Mono.delay(Duration.ofMillis(100))
+				.map(v -> 100 / v)
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		new MonoMetrics<>(source, registry, percentiles)
+				.onErrorReturn(-1L)
+				.block();
+
+		Timer stcErrorTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_ON_ERROR))
+				.timer();
+
+		SoftAssertions.assertSoftly(softly -> {
+			softly.assertThat(stcErrorTimer)
+					.as("subscribe to complete error exists")
+					.isNotNull();
+
+			softly.assertThat(stcErrorTimer.takeSnapshot().percentileValues())
+					.as("subscribe to error timer has percentiles")
+					.hasSameSizeAs(percentiles)
+					.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
 		});
 	}
 
@@ -320,6 +378,36 @@ public class MonoMetricsTest {
 			softly.assertThat(stcCancelTimer.max(TimeUnit.MILLISECONDS))
 					.as("subscribe to cancel timer")
 					.isGreaterThanOrEqualTo(100);
+
+			softly.assertThat(stcCancelTimer.takeSnapshot().percentileValues())
+					.as("subscribe to cancel timer shouldn't has percentiles")
+					.isEmpty();
+		});
+	}
+
+	@Test
+	public void subscribeToCancelWithPercentiles() throws InterruptedException {
+		Mono<Long> source = Mono.delay(Duration.ofMillis(200))
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		Disposable disposable = new MonoMetrics<>(source, registry,percentiles).subscribe();
+		Thread.sleep(100);
+		disposable.dispose();
+
+		Timer stcCancelTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_CANCEL))
+				.timer();
+
+		SoftAssertions.assertSoftly(softly -> {
+
+			softly.assertThat(stcCancelTimer)
+					.as("subscribe to cancel timer exists")
+					.isNotNull();
+
+			softly.assertThat(stcCancelTimer.takeSnapshot().percentileValues())
+					.as("subscribe to cancel timer has percentiles")
+					.hasSameSizeAs(percentiles)
+					.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
 		});
 	}
 

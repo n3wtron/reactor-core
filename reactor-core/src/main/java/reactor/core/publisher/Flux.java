@@ -18,6 +18,7 @@ package reactor.core.publisher;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -6020,14 +6021,18 @@ public abstract class Flux<T> implements CorePublisher<T> {
 	 * @return an instrumented {@link Flux}
 	 */
 	public final Flux<T> metrics() {
+		return metricsWithPercentiles();
+	}
+
+	public final Flux<T> metricsWithPercentiles(Double... percentiles) {
 		if (!Metrics.isInstrumentationAvailable()) {
 			return this;
 		}
 
 		if (this instanceof Fuseable) {
-			return onAssembly(new FluxMetricsFuseable<>(this));
+			return onAssembly(new FluxMetricsFuseable<>(this, Arrays.asList(percentiles)));
 		}
-		return onAssembly(new FluxMetrics<>(this));
+		return onAssembly(new FluxMetrics<>(this, Arrays.asList(percentiles)));
 	}
 
 	/**

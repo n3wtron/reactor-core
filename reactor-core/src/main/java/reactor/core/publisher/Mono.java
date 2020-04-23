@@ -17,6 +17,7 @@
 package reactor.core.publisher;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
@@ -3087,14 +3088,18 @@ public abstract class Mono<T> implements CorePublisher<T> {
 	 * @return an instrumented {@link Mono}
 	 */
 	public final Mono<T> metrics() {
+		return metricsWithPercentiles();
+	}
+
+	public final Mono<T> metricsWithPercentiles(Double... percentiles) {
 		if (!Metrics.isInstrumentationAvailable()) {
 			return this;
 		}
 
 		if (this instanceof Fuseable) {
-			return onAssembly(new MonoMetricsFuseable<>(this));
+			return onAssembly(new MonoMetricsFuseable<>(this, Arrays.asList(percentiles)));
 		}
-		return onAssembly(new MonoMetrics<>(this));
+		return onAssembly(new MonoMetrics<>(this, Arrays.asList(percentiles)));
 	}
 
 	/**

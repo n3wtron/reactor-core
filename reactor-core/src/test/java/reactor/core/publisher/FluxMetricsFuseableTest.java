@@ -64,7 +64,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, Clock.SYSTEM, "foo", Tags.empty());
+						registry, Clock.SYSTEM, "foo", Tags.empty(),null);
 
 		Fuseable.QueueSubscription<Integer> testQueue = new FluxPeekFuseableTest.AssertQueueSubscription<>();
 		testQueue.offer(1);
@@ -86,7 +86,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, Clock.SYSTEM, "foo", Tags.empty());
+						registry, Clock.SYSTEM, "foo", Tags.empty(), null);
 
 		assertThat(fuseableSubscriber.size()).as("size").isEqualTo(0);
 		assertThat(fuseableSubscriber.isEmpty()).as("isEmpty").isTrue();
@@ -104,7 +104,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, clock, "foo", Tags.empty());
+						registry, clock, "foo", Tags.empty(), null);
 
 		Fuseable.QueueSubscription<Integer> testQueue = new FluxPeekFuseableTest.AssertQueueSubscription<>();
 		testQueue.offer(1);
@@ -137,7 +137,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, clock, "foo", Tags.empty());
+						registry, clock, "foo", Tags.empty(), null);
 
 		Fuseable.QueueSubscription<Integer> testQueue = new FluxPeekFuseableTest.AssertQueueSubscription<>();
 		testQueue.offer(1);
@@ -173,7 +173,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, clock, "foo", Tags.empty());
+						registry, clock, "foo", Tags.empty(), null);
 
 		FluxPeekFuseableTest.AssertQueueSubscription<Integer> testQueue = new FluxPeekFuseableTest.AssertQueueSubscription<>();
 		testQueue.setCompleteWithError(true);
@@ -204,7 +204,7 @@ public class FluxMetricsFuseableTest {
 		AssertSubscriber<Integer> testSubscriber = AssertSubscriber.create();
 		FluxMetricsFuseable.MetricsFuseableSubscriber<Integer> fuseableSubscriber =
 				new FluxMetricsFuseable.MetricsFuseableSubscriber<>(testSubscriber,
-						registry, Clock.SYSTEM, "foo", Tags.empty());
+						registry, Clock.SYSTEM, "foo", Tags.empty(), null);
 
 		Fuseable.QueueSubscription<Integer> testQueue = new FluxPeekFuseableTest.AssertQueueSubscription<>();
 		fuseableSubscriber.onSubscribe(testQueue);

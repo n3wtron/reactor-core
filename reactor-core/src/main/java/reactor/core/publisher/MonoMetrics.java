@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
+import java.util.List;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.util.annotation.Nullable;
@@ -42,9 +43,14 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 	final String        name;
 	final Tags          tags;
 	final MeterRegistry meterRegistry;
+	final List<Double> percentiles;
 
-	MonoMetrics(Mono<? extends T> mono) {
-		this(mono, null);
+	MonoMetrics(Mono<? extends T> mono, @Nullable List<Double> percentiles) {
+		this(mono, null, percentiles);
+	}
+
+	MonoMetrics(Mono<? extends T> mono, @Nullable MeterRegistry meterRegistry) {
+		this(mono, meterRegistry, null);
 	}
 
 	/**
@@ -52,11 +58,12 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 	 *
 	 * @param meterRegistry the registry to use
 	 */
-	MonoMetrics(Mono<? extends T> mono, @Nullable MeterRegistry meterRegistry) {
+	MonoMetrics(Mono<? extends T> mono, @Nullable MeterRegistry meterRegistry, @Nullable List<Double> percentiles) {
 		super(mono);
 
 		this.name = resolveName(mono);
 		this.tags = resolveTags(mono, FluxMetrics.DEFAULT_TAGS_MONO, this.name);
+		this.percentiles = percentiles;
 
 		if (meterRegistry == null) {
 			this.meterRegistry = Metrics.globalRegistry;
@@ -68,7 +75,7 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 
 	@Override
 	public CoreSubscriber<? super T> subscribeOrReturn(CoreSubscriber<? super T> actual) {
-		return new MetricsSubscriber<>(actual, meterRegistry, Clock.SYSTEM, this.tags);
+		return new MetricsSubscriber<>(actual, meterRegistry, Clock.SYSTEM, this.tags, this.percentiles);
 	}
 
 	static class MetricsSubscriber<T> implements InnerOperator<T, T> {
@@ -77,17 +84,19 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 		final Clock                     clock;
 		final Tags                      commonTags;
 		final MeterRegistry             registry;
+		final List<Double> 							percentiles;
 
 		Timer.Sample subscribeToTerminateSample;
 		boolean done;
 		Subscription s;
 
 		MetricsSubscriber(CoreSubscriber<? super T> actual,
-				MeterRegistry registry, Clock clock, Tags commonTags) {
+				MeterRegistry registry, Clock clock, Tags commonTags, List<Double> percentiles) {
 			this.actual = actual;
 			this.clock = clock;
 			this.commonTags = commonTags;
 			this.registry = registry;
+			this.percentiles = percentiles;
 		}
 
 		@Override
@@ -97,7 +106,7 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 
 		@Override
 		final public void cancel() {
-			FluxMetrics.recordCancel(commonTags, registry, subscribeToTerminateSample);
+			FluxMetrics.recordCancel(commonTags, registry, subscribeToTerminateSample, percentiles);
 			s.cancel();
 		}
 
@@ -107,7 +116,7 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 				return;
 			}
 			done = true;
-			FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample);
+			FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample, percentiles);
 			actual.onComplete();
 		}
 
@@ -119,7 +128,7 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 				return;
 			}
 			done = true;
-			FluxMetrics.recordOnError(commonTags, registry, subscribeToTerminateSample, e);
+			FluxMetrics.recordOnError(commonTags, registry, subscribeToTerminateSample, percentiles, e);
 			actual.onError(e);
 		}
 
@@ -132,7 +141,7 @@ final class MonoMetrics<T> extends InternalMonoOperator<T, T> {
 			}
 			done = true;
 			//TODO looks like we don't count onNext: `Mono.empty()` vs `Mono.just("foo")`
-			FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample);
+			FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample, percentiles);
 			actual.onNext(t);
 			actual.onComplete();
 		}

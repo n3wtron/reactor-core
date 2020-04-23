@@ -22,7 +22,6 @@ import java.util.concurrent.TimeUnit;
 import io.micrometer.core.instrument.Clock;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import org.reactivestreams.Subscription;
@@ -46,9 +45,14 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 	final String        name;
 	final Tags          tags;
 	final MeterRegistry registryCandidate;
+	final List<Double> percentiles;
 
-	FluxMetricsFuseable(Flux<? extends T> flux) {
-		this(flux, null);
+	FluxMetricsFuseable(Flux<? extends T> flux, @Nullable List<Double> percentiles) {
+		this(flux, null, percentiles);
+	}
+
+	FluxMetricsFuseable(Flux<? extends T> flux, @Nullable MeterRegistry candidate) {
+		this(flux, candidate, null);
 	}
 
 	/**
@@ -56,11 +60,12 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 	 *
 	 * @param candidate the registry to use, as a plain {@link Object} to avoid leaking dependency
 	 */
-	FluxMetricsFuseable(Flux<? extends T> flux, @Nullable MeterRegistry candidate) {
+	FluxMetricsFuseable(Flux<? extends T> flux, @Nullable MeterRegistry candidate, @Nullable List<Double> percentiles) {
 		super(flux);
 
 		this.name = resolveName(flux);
 		this.tags = resolveTags(flux, FluxMetrics.DEFAULT_TAGS_FLUX, this.name);
+		this.percentiles = percentiles;
 
 		if (candidate == null) {
 			this.registryCandidate = Metrics.globalRegistry;
@@ -72,7 +77,7 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 
 	@Override
 	public CoreSubscriber<? super T> subscribeOrReturn(CoreSubscriber<? super T> actual) {
-		return new MetricsFuseableSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.name, this.tags);
+		return new MetricsFuseableSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.name, this.tags, this.percentiles);
 	}
 
 	/**
@@ -94,8 +99,10 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 				MeterRegistry registry,
 				Clock clock,
 				String sequenceName,
-				Tags sequenceTags) {
-			super(actual, registry, clock, sequenceName, sequenceTags);
+				Tags sequenceTags,
+				List<Double> percentile
+		) {
+			super(actual, registry, clock, sequenceName, sequenceTags, percentile);
 		}
 
 		@Override
@@ -141,7 +148,7 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 				T v = qs.poll();
 
 				if (v == null && mode == SYNC) {
-					recordOnComplete(commonTags, registry, subscribeToTerminateSample);
+					recordOnComplete(commonTags, registry, subscribeToTerminateSample, percentiles);
 				}
 				if (v != null) {
 					//this is an onNext event
@@ -153,7 +160,7 @@ final class FluxMetricsFuseable<T> extends InternalFluxOperator<T, T> implements
 				return v;
 			}
 			catch (Throwable e) {
-				recordOnError(commonTags, registry, subscribeToTerminateSample, e);
+				recordOnError(commonTags, registry, subscribeToTerminateSample, percentiles, e);
 				throw e;
 			}
 		}

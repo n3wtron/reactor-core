@@ -17,6 +17,8 @@
 package reactor.core.publisher;
 
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -263,6 +265,10 @@ public class FluxMetricsTest {
 					.as("subscribe to complete timer")
 					.isGreaterThanOrEqualTo(100);
 
+			softly.assertThat(stcCompleteTimer.takeSnapshot().percentileValues())
+					.as("subscribe to complete timer shouldn't has percentiles")
+					.isEmpty();
+
 			softly.assertThat(stcErrorTimer)
 					.as("subscribe to error timer is lazily registered")
 					.isNull();
@@ -270,6 +276,31 @@ public class FluxMetricsTest {
 			softly.assertThat(stcCancelTimer)
 					.as("subscribe to cancel timer")
 					.isNull();
+		});
+	}
+
+	@Test
+	public void subscribeToCompleteWithPercentiles() {
+		Flux<String> source = Flux.just("foo")
+				.delayElements(Duration.ofMillis(100))
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		new FluxMetrics<>(source, registry, percentiles)
+				.blockLast();
+
+		Timer stcCompleteTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_ON_COMPLETE))
+				.timer();
+
+		SoftAssertions.assertSoftly(softly -> {
+			softly.assertThat(stcCompleteTimer)
+					.as("subscribe to complete timer exists")
+					.isNotNull();
+
+			softly.assertThat(stcCompleteTimer.takeSnapshot().percentileValues())
+					.as("subscribe to complete timer has percentiles")
+					.hasSameSizeAs(percentiles)
+					.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
 		});
 	}
 
@@ -304,9 +335,42 @@ public class FluxMetricsTest {
 					.as("subscribe to error timer")
 					.isGreaterThanOrEqualTo(100);
 
+			softly.assertThat(stcErrorTimer.takeSnapshot().percentileValues())
+					.as("subscribe to error timer shouldn't has percentiles")
+					.isEmpty();
+
 			softly.assertThat(stcCancelTimer)
 					.as("subscribe to cancel timer")
 					.isNull();
+		});
+	}
+
+	@Test
+	public void subscribeToErrorWithPercentiles() {
+		Flux<Integer> source = Flux.just(1, 0)
+				.delayElements(Duration.ofMillis(100))
+				.map(v -> 100 / v)
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		new FluxMetrics<>(source, registry, percentiles)
+				.onErrorReturn(-1)
+				.blockLast();
+
+		Timer stcErrorTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_ON_ERROR))
+				.timer();
+
+		SoftAssertions.assertSoftly(softly -> {
+
+			softly.assertThat(stcErrorTimer)
+					.as("subscribe to complete error exists")
+					.isNotNull();
+
+			softly.assertThat(stcErrorTimer.takeSnapshot().percentileValues())
+					.as("subscribe to error timer has percentiles")
+					.hasSameSizeAs(percentiles)
+					.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
+
 		});
 	}
 
@@ -343,6 +407,37 @@ public class FluxMetricsTest {
 			softly.assertThat(stcCancelTimer.max(TimeUnit.MILLISECONDS))
 					.as("subscribe to cancel timer")
 					.isGreaterThanOrEqualTo(100);
+
+			softly.assertThat(stcCancelTimer.takeSnapshot().percentileValues())
+					.as("subscribe to cancel timer shouldn't has percentiles")
+					.isEmpty();
+		});
+	}
+
+	@Test
+	public void subscribeToCancelWithPercentiles() {
+		Flux<Integer> source = Flux.just(1, 0)
+				.delayElements(Duration.ofMillis(100))
+				.hide();
+		final List<Double> percentiles = Arrays.asList(0.95, 0.98);
+		new FluxMetrics<>(source, registry, percentiles)
+				.take(1)
+				.blockLast();
+
+		Timer stcCancelTimer = registry.find(METER_FLOW_DURATION)
+				.tags(Tags.of(TAG_CANCEL))
+				.timer();
+
+		SoftAssertions.assertSoftly(softly -> {
+
+			softly.assertThat(stcCancelTimer)
+					.as("subscribe to cancel timer exists")
+					.isNotNull();
+
+			softly.assertThat(stcCancelTimer.takeSnapshot().percentileValues())
+					.as("subscribe to cancel timer has percentiles")
+					.hasSameSizeAs(percentiles)
+					.allMatch(valueAtPercentile -> percentiles.contains(valueAtPercentile.percentile()));
 		});
 	}
 

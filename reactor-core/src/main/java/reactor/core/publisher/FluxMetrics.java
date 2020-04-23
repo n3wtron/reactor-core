@@ -16,6 +16,9 @@
 
 package reactor.core.publisher;
 
+import io.micrometer.core.instrument.Timer.Builder;
+import io.micrometer.core.instrument.Timer.Sample;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
@@ -50,13 +53,22 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 
 	final String name;
 	final Tags tags;
+	final List<Double> percentile;
 
 	//Note: meters and tag names are normalized by micrometer on the basis that the word
 	// separator is the dot, not camelCase...
 	final MeterRegistry registryCandidate;
 
+	FluxMetrics(Flux<? extends T> flux, @Nullable List<Double> percentile) {
+		this(flux, null, percentile);
+	}
+
+	FluxMetrics(Flux<? extends T> flux, @Nullable MeterRegistry registry) {
+		this(flux, registry, null);
+	}
+
 	FluxMetrics(Flux<? extends T> flux) {
-		this(flux, null);
+		this(flux, null, null);
 	}
 
 	/**
@@ -64,11 +76,12 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 	 *
 	 * @param registry the registry to use, or null for global one
 	 */
-	FluxMetrics(Flux<? extends T> flux, @Nullable MeterRegistry registry) {
+	FluxMetrics(Flux<? extends T> flux, @Nullable MeterRegistry registry, @Nullable List<Double> percentile) {
 		super(flux);
 
 		this.name = resolveName(flux);
 		this.tags = resolveTags(flux, DEFAULT_TAGS_FLUX, this.name);
+		this.percentile = percentile;
 
 		if (registry == null) {
 			this.registryCandidate = Metrics.globalRegistry;
@@ -80,7 +93,7 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 
 	@Override
 	public CoreSubscriber<? super T> subscribeOrReturn(CoreSubscriber<? super T> actual) {
-		return new MetricsSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.name, this.tags);
+		return new MetricsSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.name, this.tags, this.percentile);
 	}
 
 	static class MetricsSubscriber<T> implements InnerOperator<T, T> {
@@ -91,6 +104,7 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 		final MeterRegistry             registry;
 		final DistributionSummary       requestedCounter;
 		final Timer                     onNextIntervalTimer;
+		final List<Double>              percentiles;
 
 		Timer.Sample subscribeToTerminateSample;
 		long         lastNextEventNanos = -1L;
@@ -101,18 +115,22 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 				MeterRegistry registry,
 				Clock clock,
 				String sequenceName,
-				Tags commonTags) {
+				Tags commonTags,
+				List<Double> percentiles
+				) {
 			this.actual = actual;
 			this.clock = clock;
 			this.commonTags = commonTags;
 			this.registry = registry;
+			this.percentiles = percentiles;
 
+			Timer.Builder onNextIntervalTimerBld = Timer.builder(METER_ON_NEXT_DELAY)
+																									.tags(commonTags)
+																									.description(
+																											"Measures delays between onNext signals (or between onSubscribe and first onNext)");
 
-			this.onNextIntervalTimer = Timer.builder(METER_ON_NEXT_DELAY)
-			                                .tags(commonTags)
-			                                .description(
-					                                "Measures delays between onNext signals (or between onSubscribe and first onNext)")
-			                                .register(registry);
+			applyPercentiles(percentiles,onNextIntervalTimerBld);
+			this.onNextIntervalTimer = onNextIntervalTimerBld.register(registry);
 
 			if (!REACTOR_DEFAULT_NAME.equals(sequenceName)) {
 				this.requestedCounter = DistributionSummary.builder(METER_REQUESTED)
@@ -136,7 +154,7 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 		final public void cancel() {
 			//we don't record the time between last onNext and cancel,
 			// because it would skew the onNext count by one
-			recordCancel(commonTags, registry, subscribeToTerminateSample);
+			recordCancel(commonTags, registry, subscribeToTerminateSample, percentiles);
 
 			s.cancel();
 		}
@@ -149,7 +167,7 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 			done = true;
 			//we don't record the time between last onNext and onComplete,
 			// because it would skew the onNext count by one
-			recordOnComplete(commonTags, registry, subscribeToTerminateSample);
+			recordOnComplete(commonTags, registry, subscribeToTerminateSample, percentiles);
 
 			actual.onComplete();
 		}
@@ -164,7 +182,7 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 			done = true;
 			//we don't record the time between last onNext and onError,
 			// because it would skew the onNext count by one
-			recordOnError(commonTags, registry, subscribeToTerminateSample, e);
+			recordOnError(commonTags, registry, subscribeToTerminateSample, percentiles, e);
 			actual.onError(e);
 		}
 
@@ -282,7 +300,6 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 			log.warn("Attempting to activate metrics but the upstream is not Scannable. " + "You might want to use `name()` (and optionally `tags()`) right before `metrics()`");
 			return REACTOR_DEFAULT_NAME;
 		}
-
 	}
 
 	/**
@@ -313,14 +330,13 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 	 * is equivalent to registering the meter as a final field, with the added benefit of paying that
 	 * cost only in case of cancellation.
 	 */
-	static void recordCancel(Tags commonTags, MeterRegistry registry, Timer.Sample flowDuration) {
-		Timer timer = Timer.builder(METER_FLOW_DURATION)
-		                   .tags(commonTags.and(TAG_CANCEL))
-		                   .description(
-				                   "Times the duration elapsed between a subscription and the cancellation of the sequence")
-		                   .register(registry);
-
-		flowDuration.stop(timer);
+	static void recordCancel(Tags commonTags, MeterRegistry registry, Timer.Sample flowDuration, List<Double> percentiles) {
+		Timer.Builder timerBuilder = Timer.builder(METER_FLOW_DURATION)
+				                              .tags(commonTags.and(TAG_CANCEL))
+				                              .description(
+				                              		"Times the duration elapsed between a subscription and the cancellation of the sequence");
+		applyPercentiles(percentiles, timerBuilder);
+		flowDuration.stop(timerBuilder.register(registry));
 	}
 
 	/*
@@ -340,17 +356,24 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 	 * which is equivalent to registering the meter as a final field, with the added benefit of paying
 	 * that cost only in case of error.
 	 */
-	static void recordOnError(Tags commonTags, MeterRegistry registry, Timer.Sample flowDuration, Throwable e) {
-		Timer timer = Timer.builder(METER_FLOW_DURATION)
-		                   .tags(commonTags.and(TAG_ON_ERROR))
-		                   .tag(TAG_KEY_EXCEPTION,
-				                   e.getClass()
-				                    .getName())
-		                   .description(
-				                   "Times the duration elapsed between a subscription and the onError termination of the sequence, with the exception name as a tag.")
-		                   .register(registry);
+	static void recordOnError(Tags commonTags, MeterRegistry registry, Timer.Sample flowDuration,List<Double> percentile, Throwable e) {
+		Timer.Builder timerBuilder = Timer.builder(METER_FLOW_DURATION)
+				                              .tags(commonTags.and(TAG_ON_ERROR))
+				                              .tag(TAG_KEY_EXCEPTION, e.getClass().getName())
+				                              .description(
+				                              		"Times the duration elapsed between a subscription and the onError termination of the sequence, with the exception name as a tag.");
+		applyPercentiles(percentile, timerBuilder);
+		flowDuration.stop(timerBuilder.register(registry));
+	}
 
-		flowDuration.stop(timer);
+	/*
+	 * This method add the percentiles to a Timer.Builder.
+	 */
+	private static void applyPercentiles(@Nullable List<Double> percentiles, Timer.Builder timerBuilder) {
+		if (percentiles != null && !percentiles.isEmpty()) {
+			double[] percentileVargs = percentiles.stream().mapToDouble(d -> d).toArray();
+			timerBuilder.publishPercentiles(percentileVargs);
+		}
 	}
 
 	/*
@@ -359,14 +382,13 @@ final class FluxMetrics<T> extends InternalFluxOperator<T, T> {
 	 * which is equivalent to registering the meter as a final field, with the added benefit of paying
 	 * that cost only in case of completion (which is not always occurring).
 	 */
-	static void recordOnComplete(Tags commonTags, MeterRegistry registry, Timer.Sample flowDuration) {
-		Timer timer = Timer.builder(METER_FLOW_DURATION)
-		                   .tags(commonTags.and(TAG_ON_COMPLETE))
-		                   .description(
-				                   "Times the duration elapsed between a subscription and the onComplete termination of the sequence")
-		                   .register(registry);
-
-		flowDuration.stop(timer);
+	static void recordOnComplete(Tags commonTags, MeterRegistry registry, Sample flowDuration, List<Double> percentiles) {
+		Timer.Builder timerBuilder = Timer.builder(METER_FLOW_DURATION)
+				                              .tags(commonTags.and(TAG_ON_COMPLETE))
+				                              .description(
+				                              		"Times the duration elapsed between a subscription and the onComplete termination of the sequence");
+		applyPercentiles(percentiles, timerBuilder);
+		flowDuration.stop(timerBuilder.register(registry));
 	}
 
 	/*

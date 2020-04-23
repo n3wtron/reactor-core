@@ -127,3 +127,19 @@ listenToEvents()
 <2> All reported metrics will have `source=kafka` tag assigned in addition to the common tags described above.
 
 ====
+
+=== Percentiles
+To publish the percentiles on timers you can use the `metricsWithPercentiles` method instead of `metrics` method
+====
+[source,java]
+----
+listenToEvents()
+    .name("events")
+    .metricsWithPercentiles(0.95,0.98) <1>
+    .doOnNext(event -> log.info("Received {}", event))
+    .delayUntil(this::processEvent)
+    .retry()
+    .subscribe();
+----
+<1> will publish the percentiles `0.95` and `0.98`
+====

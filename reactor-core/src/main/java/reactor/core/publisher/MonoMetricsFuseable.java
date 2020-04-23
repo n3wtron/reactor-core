@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
+import java.util.List;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
@@ -44,9 +45,19 @@ final class MonoMetricsFuseable<T> extends InternalMonoOperator<T, T> implements
 	final Tags   tags;
 
 	final MeterRegistry registryCandidate;
+	final List<Double> percentiles;
+
+	MonoMetricsFuseable(Mono<? extends T> mono, @Nullable List<Double> percentiles) {
+		this(mono, null, percentiles);
+
+	}
+
+	MonoMetricsFuseable(Mono<? extends T> mono, @Nullable MeterRegistry registryCandidate) {
+		this(mono, registryCandidate, null);
+	}
 
 	MonoMetricsFuseable(Mono<? extends T> mono) {
-		this(mono, null);
+		this(mono, null, null);
 	}
 
 	/**
@@ -54,11 +65,12 @@ final class MonoMetricsFuseable<T> extends InternalMonoOperator<T, T> implements
 	 *
 	 * @param registryCandidate the registry to use, as a plain {@link Object} to avoid leaking dependency
 	 */
-	MonoMetricsFuseable(Mono<? extends T> mono, @Nullable MeterRegistry registryCandidate) {
+	MonoMetricsFuseable(Mono<? extends T> mono, @Nullable MeterRegistry registryCandidate, @Nullable List<Double> percentiles) {
 		super(mono);
 
 		this.name = resolveName(mono);
 		this.tags = resolveTags(mono, FluxMetrics.DEFAULT_TAGS_MONO, this.name);
+		this.percentiles = percentiles;
 
 		if (registryCandidate == null) {
 			this.registryCandidate = Metrics.globalRegistry;
@@ -70,7 +82,7 @@ final class MonoMetricsFuseable<T> extends InternalMonoOperator<T, T> implements
 
 	@Override
 	public CoreSubscriber<? super T> subscribeOrReturn(CoreSubscriber<? super T> actual) {
-		return new MetricsFuseableSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.tags);
+		return new MetricsFuseableSubscriber<>(actual, registryCandidate, Clock.SYSTEM, this.tags, this.percentiles);
 	}
 
 	/**
@@ -91,8 +103,10 @@ final class MonoMetricsFuseable<T> extends InternalMonoOperator<T, T> implements
 		MetricsFuseableSubscriber(CoreSubscriber<? super T> actual,
 				MeterRegistry registry,
 				Clock clock,
-				Tags sequenceTags) {
-			super(actual, registry, clock, sequenceTags);
+				Tags sequenceTags,
+				List<Double> percentiles
+		) {
+			super(actual, registry, clock, sequenceTags, percentiles);
 		}
 
 		@Override
@@ -128,13 +142,13 @@ final class MonoMetricsFuseable<T> extends InternalMonoOperator<T, T> implements
 			try {
 				T v = qs.poll();
 				if (!done && (v != null || mode == SYNC)) {
-					FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample);
+					FluxMetrics.recordOnComplete(commonTags, registry, subscribeToTerminateSample, percentiles);
 				}
 				done = true;
 				return v;
 			}
 			catch (Throwable e) {
-				FluxMetrics.recordOnError(commonTags, registry, subscribeToTerminateSample, e);
+				FluxMetrics.recordOnError(commonTags, registry, subscribeToTerminateSample, percentiles, e);
 				throw e;
 			}
 		}
